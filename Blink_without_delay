@@ -1,0 +1,69 @@
+const int buttonPin = 2;   // Button pin
+const int RledPin = 4;     // Red pin
+const int GledPin = 5;     // Green pin
+const int BledPin = 3;     // Blue pin
+
+int ledColor = 0;                      // current color index
+bool reverseOrder = false;             // false = forward, true = reverse
+int lastButtonState = LOW;
+unsigned long previousMillis = 0;
+const unsigned long interval = 1000;   // 1 second per color
+
+void setup() {
+  pinMode(buttonPin, INPUT);
+  pinMode(RledPin, OUTPUT);
+  pinMode(GledPin, OUTPUT);
+  pinMode(BledPin, OUTPUT);
+}
+
+void loop() {
+  unsigned long currentMillis = millis();
+
+  // --- Handle Button Press ---
+  int buttonState = digitalRead(buttonPin);
+
+  if (buttonState == HIGH && lastButtonState == LOW) {
+    reverseOrder = !reverseOrder; // toggle order
+    delay(50); // debounce
+  }
+  lastButtonState = buttonState;
+
+  // --- Handle Color Change ---
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+
+    if (!reverseOrder) {
+      ledColor++;
+      if (ledColor > 3) ledColor = 0;
+    } else {
+      ledColor--;
+      if (ledColor < 0) ledColor = 3;
+    }
+  }
+
+  // --- Set LED Colors ---
+  if (ledColor == 0) {
+    // RED
+    digitalWrite(RledPin, LOW);
+    digitalWrite(GledPin, HIGH);
+    digitalWrite(BledPin, HIGH);
+  }
+  else if (ledColor == 1) {
+    // GREEN
+    digitalWrite(RledPin, HIGH);
+    digitalWrite(GledPin, LOW);
+    digitalWrite(BledPin, HIGH);
+  }
+  else if (ledColor == 2) {
+    // BLUE
+    digitalWrite(RledPin, HIGH);
+    digitalWrite(GledPin, HIGH);
+    digitalWrite(BledPin, LOW);
+  }
+  else if (ledColor == 3) {
+    // WHITE (all ON)
+    digitalWrite(RledPin, LOW);
+    digitalWrite(GledPin, LOW);
+    digitalWrite(BledPin, LOW);
+  }
+}
