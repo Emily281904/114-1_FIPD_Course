@@ -19,7 +19,7 @@ void setup() {
 void loop() {
   unsigned long currentMillis = millis();
 
-  // --- Handle Button Press ---
+  //Handle Button Press 
   int buttonState = digitalRead(buttonPin);
 
   if (buttonState == HIGH && lastButtonState == LOW) {
@@ -28,7 +28,7 @@ void loop() {
   }
   lastButtonState = buttonState;
 
-  // --- Handle Color Change ---
+  //Handle Color Change 
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
 
@@ -41,7 +41,7 @@ void loop() {
     }
   }
 
-  // --- Set LED Colors ---
+  //Set LED Colors
   if (ledColor == 0) {
     // RED
     digitalWrite(RledPin, LOW);
