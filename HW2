@@ -1,0 +1,123 @@
+// --- [ 1. Pin and Variable Definitions ] ---
+// Pin definitions are based on your module's connection V R G B.
+// We assume R, G, B pins are connected to D9, D10, D11 respectively.
+// If your wires are different, change the PIN NUMBERS here!
+const int RledPin = 9;  // Pin for the RED component (Sad: 0 points)
+const int GledPin = 10; // Pin for the GREEN component (Neutral: 10 points)
+const int BledPin = 11; // Pin for the BLUE component (Happy: 20 points)
+
+// Pin for the button (connected to Digital Pin 2)
+const int buttonPin = 2; 
+
+// State Variables
+int mood = 10;             // Current mood level of the toy (0 to 20). Starts at Neutral (10).
+const int neutralMood = 10; // Neutral mood value (Green/Yellow-Green mix)
+bool buttonPressed = false; // Flag to track if the press event has been handled
+
+// Timing variables (using millis() for non-blocking timing)
+unsigned long touchedTimer = 0;      // Stores the time of the last button press
+const unsigned long unTouchInterval = 5000; // Interval (5 seconds) before mood decay starts
+unsigned long reducedTimer = 0;      // Timer for mood decay
+const unsigned long reducedInterval = 1000; // Interval (1 second) to reduce mood by 1
+
+// --- [ 2. Function to Display Mood via RGB LED (UPDATED LOGIC) ] ---
+// Sets the color of the RGB LED based on the 'state' (mood level 0-20)
+void showLEDState(int state) {
+  // We use 10 as the range for color transition (0-10 and 10-20)
+  float brightnessInterval = 255.0 / (float)neutralMood; 
+  int R_val, G_val, B_val; // Values for analogWrite (0-255)
+
+  // Assuming Common Anode (0 = ON, 255 = OFF)
+  
+  if (state >= neutralMood) {
+    // MOOD 10 (Neutral/Green) -> 20 (Happy/Blue)
+    
+    // Red: Stays OFF (255)
+    R_val = 255; 
+    
+    // Green: Fades OUT from 0 (at mood=10) to 255 (at mood=20)
+    // The less Green, the purer the Blue becomes.
+    G_val = (int)(brightnessInterval * (state - neutralMood));
+    
+    // Blue: Stays ON (0)
+    B_val = 0;
+    
+  } else { 
+    // MOOD 10 (Neutral/Green) -> 0 (Sad/Red)
+    
+    // Red: Stays ON (0)
+    R_val = 0; 
+    
+    // Green: Fades OUT from 0 (at mood=10) to 255 (at mood=0)
+    // The less Green, the purer the Red becomes.
+    G_val = (int)(brightnessInterval * (neutralMood - state));
+    
+    // Blue: Stays OFF (255)
+    B_val = 255; 
+  }
+  
+  // Write the final values to the pins
+  analogWrite(RledPin, R_val); 
+  analogWrite(GledPin, G_val); 
+  analogWrite(BledPin, B_val);
+}
+
+// --- [ 3. Setup Function - Runs once when the program starts ] ---
+void setup() {
+  // Initialize LED pins as outputs
+  pinMode(RledPin, OUTPUT);
+  pinMode(GledPin, OUTPUT);
+  pinMode(BledPin, OUTPUT);
+  
+  // Initialize the button pin as an input with an internal pull-up resistor (for module button)
+  pinMode(buttonPin, INPUT_PULLUP); 
+  
+  // Set initial mood and timers
+  mood = neutralMood; // Start at 10 (Green)
+  touchedTimer = millis(); 
+  reducedTimer = millis();
+}
+
+// --- [ 4. Loop Function - Runs repeatedly and continuously ] ---
+void loop() {
+  // 1. Display the current mood state color
+  showLEDState(mood);
+
+  // Read the current time
+  unsigned long currentTimer = millis();
+  
+  // 2. Check for button press to increase mood
+  int buttonState = digitalRead(buttonPin);
+  
+  // If button is pressed (LOW) AND the press hasn't been handled yet
+  if (buttonState == LOW && !buttonPressed) {
+    // Increase mood, up to a maximum of 20
+    if (mood < 20) {
+      mood++;
+    }
+    touchedTimer = currentTimer; // Reset the "untouched" timer
+    buttonPressed = true;        // Set flag that the press is handled
+  } 
+  
+  // Reset the flag when the button is released (HIGH)
+  if (buttonState == HIGH && buttonPressed) {
+    buttonPressed = false; 
+  }
+
+  // 3. Check for time decay (mood reduction)
+  // First check: Has 5 seconds passed since the last touch?
+  if (currentTimer - touchedTimer > unTouchInterval) {
+    
+    // Second check: If yes, has 1 second passed since the last mood reduction?
+    if (currentTimer - reducedTimer > reducedInterval) {
+      
+      // Reduce mood, down to a minimum of 0
+      if (mood > 0) {
+        mood--;
+      }
+      
+      // Reset the decay timer
+      reducedTimer = currentTimer;
+    }
+  }
+}
