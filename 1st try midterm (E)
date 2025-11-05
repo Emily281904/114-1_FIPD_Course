@@ -1,0 +1,127 @@
+// === Assignment E (Final Complete Version) ===
+// Arduino Nano + RGB LED + Button
+// Features:
+// - Default: constant color cycling every 1 second
+// - Short press: toggle between CONSTANT and BLINKING mode
+// - Hold button: white fading effect (while held)
+// - Release button: return to previous mode
+
+const int pinR = 3;
+const int pinG = 5;
+const int pinB = 6;
+const int buttonPin = 2;
+const bool COMMON_ANODE = true;
+
+enum Mode { CONSTANT, BLINKING };
+Mode mode = CONSTANT;
+
+struct Color { int r, g, b; };
+Color colors[] = {
+  {255, 0, 0},     // Red
+  {255, 255, 0},   // Yellow
+  {0, 255, 0},     // Green
+  {0, 0, 255},     // Blue
+  {255, 0, 255}    // Purple
+};
+const int NUM_COLORS = sizeof(colors) / sizeof(colors[0]);
+
+int colorIndex = 0;
+bool ledOn = true;
+
+unsigned long lastColorChange = 0;
+unsigned long lastBlink = 0;
+unsigned long buttonPressedAt = 0;
+
+const unsigned long COLOR_INTERVAL = 1000;  // 1 second per color
+const unsigned long BLINK_INTERVAL = 250;   // 0.25 seconds per blink
+const unsigned long LONG_PRESS_TIME = 600;  // Hold threshold (ms)
+
+bool lastButtonState = HIGH;
+bool longPressActive = false;
+
+void setup() {
+  pinMode(pinR, OUTPUT);
+  pinMode(pinG, OUTPUT);
+  pinMode(pinB, OUTPUT);
+  pinMode(buttonPin, INPUT_PULLUP);
+}
+
+void loop() {
+  unsigned long now = millis();
+  int buttonState = digitalRead(buttonPin);
+
+  // Detect button press/release
+  if (buttonState == LOW && lastButtonState == HIGH) {
+    buttonPressedAt = now;
+  }
+
+  // Long press detection
+  if (buttonState == LOW && !longPressActive && (now - buttonPressedAt > LONG_PRESS_TIME)) {
+    longPressActive = true;
+  }
+
+  // Button release
+  if (buttonState == HIGH && lastButtonState == LOW) {
+    if (longPressActive) {
+      longPressActive = false; // stop fade when released
+    } else {
+      // Short press → toggle mode
+      mode = (mode == CONSTANT) ? BLINKING : CONSTANT;
+    }
+  }
+
+  lastButtonState = buttonState;
+
+  // If button held down → fade white light
+  if (longPressActive) {
+    whiteFade(now);
+    return;
+  }
+
+  // === Main behavior ===
+  if (mode == CONSTANT) {
+    if (now - lastColorChange >= COLOR_INTERVAL) {
+      lastColorChange = now;
+      colorIndex = (colorIndex + 1) % NUM_COLORS;
+    }
+    setColor(colors[colorIndex]);
+  } 
+  else if (mode == BLINKING) {
+    if (now - lastBlink >= BLINK_INTERVAL) {
+      lastBlink = now;
+      ledOn = !ledOn;
+      if (ledOn) setColor(colors[colorIndex]);
+      else setColor({0,0,0});
+    }
+    if (now - lastColorChange >= 1000) { // after ~1 second (two blinks)
+      lastColorChange = now;
+      colorIndex = (colorIndex + 1) % NUM_COLORS;
+    }
+  }
+}
+
+// ---------- Helper functions ----------
+
+void setColor(Color c) {
+  int r = c.r, g = c.g, b = c.b;
+  if (COMMON_ANODE) {
+    r = 255 - r;
+    g = 255 - g;
+    b = 255 - b;
+  }
+  analogWrite(pinR, r);
+  analogWrite(pinG, g);
+  analogWrite(pinB, b);
+}
+
+void whiteFade(unsigned long now) {
+  const unsigned long PERIOD = 2000; // full fade cycle: 2 seconds
+  unsigned long t = now % PERIOD;
+  int brightness;
+  if (t < PERIOD / 2) {
+    brightness = map(t, 0, PERIOD / 2, 0, 255);
+  } else {
+    brightness = map(t, PERIOD / 2, PERIOD, 255, 0);
+  }
+  setColor({brightness, brightness, brightness});
+}
