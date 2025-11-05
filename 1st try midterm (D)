@@ -1,0 +1,46 @@
+// === Assignment D ===
+// The RGB LED lights up when the button is pressed,
+// and turns off when the button is released.
+
+const int pinR = 3;    // PWM pin for RED
+const int pinG = 5;    // PWM pin for GREEN
+const int pinB = 6;    // PWM pin for BLUE
+const int buttonPin = 2; // Button pin
+
+// Set to true if the RGB module is common-anode (+),
+// or false if it is common-cathode (−)
+const bool COMMON_ANODE = true;
+
+void setup() {
+  pinMode(pinR, OUTPUT);
+  pinMode(pinG, OUTPUT);
+  pinMode(pinB, OUTPUT);
+  pinMode(buttonPin, INPUT_PULLUP); // Use internal pull-up resistor
+}
+
+void loop() {
+  int buttonState = digitalRead(buttonPin);
+
+  // With INPUT_PULLUP: button pressed → LOW
+  if (buttonState == LOW) {
+    turnOnRGB(255, 0, 0); // Turn on red color
+  } else {
+    turnOffRGB(); // Turn LED off
+  }
+}
+
+void turnOnRGB(int r, int g, int b) {
+  // Adjust for common-anode type (invert brightness)
+  if (COMMON_ANODE) {
+    r = 255 - r;
+    g = 255 - g;
+    b = 255 - b;
+  }
+  analogWrite(pinR, r);
+  analogWrite(pinG, g);
+  analogWrite(pinB, b);
+}
+
+void turnOffRGB() {
+  turnOnRGB(0, 0, 0); // Turn off all colors
+}
