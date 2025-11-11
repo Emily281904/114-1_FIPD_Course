@@ -1,0 +1,35 @@
+// --- Pin Configuration for Section 4 ---
+const int buttonPin = 2;   // The digital pin connected to the button module's signal pin (IN)
+const int ledPin = 3;      // The digital pin connected to the RGB LED's Red pin (R)
+
+// --- Variables ---
+int buttonState = 0;       // Variable to store the current state of the button
+
+void setup() {
+    // Initialize the button pin as an input
+    pinMode(buttonPin, INPUT); 
+    
+    // Initialize the LED pin as an output
+    pinMode(ledPin, OUTPUT);
+    
+    // Serial.begin(9600); // Uncomment this line to use the Serial Monitor for debugging
+}
+
+void loop() {
+    // Read the state of the pushbutton value
+    buttonState = digitalRead(buttonPin);
+
+    // The button module outputs LOW when pressed (Active-LOW logic):
+    // LOW (0V) - Button IS pressed
+    // HIGH (5V) - Button IS NOT pressed
+
+    if (buttonState == LOW) { 
+        // If the button IS pressed, turn the LED ON
+        digitalWrite(ledPin, HIGH); 
+        // Serial.println("Button Pressed - LED ON");
+    } else {
+        // If the button IS NOT pressed, turn the LED OFF
+        digitalWrite(ledPin, LOW); 
+        // Serial.println("Button Released - LED OFF");
+    }
+}
