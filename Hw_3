@@ -1,0 +1,212 @@
+// --- 1. Pin Configuration ---
+const int buttonPin = 2;   // The pin of the push button
+const int RLedPin = 9;     // Pin for Red (PWM)
+const int GLedPin = 10;    // Pin for Green (PWM)
+const int BLedPin = 11;    // Pin for Blue (PWM)
+
+// --- 2. Variables for Button Handling ---
+int buttonState = 0;               // The current push button state
+bool buttonPressed = false;        // Variable used to memorize whether the user has pressed the button
+unsigned long pressingTime = 0;    // The timer used to count the pressing time
+const int longPressInterval = 500; // The threshold of the long press interval (500ms)
+
+// --- 3. Variables for Modes and Color ---
+// LightNum: 0=White, 1=Red, 2=Blue, 3=Green, 4=Yellow
+int LightNum = 0;
+// RLightColor, GLightColor, BLightColor: The target color for the current mode
+int RLightColor = 0;
+int GLightColor = 0;
+int BLightColor = 0;
+// RCurrentColor, GCurrentColor, BCurrentColor: The actual color currently displayed
+int RCurrentColor = 0;
+int GCurrentColor = 0;
+int BCurrentColor = 0;
+// currentMode: 0=Constant Light Mode, 1=Blink Mode, 2=Breathing Light Mode
+int currentMode = 0; 
+
+// --- 4. Variables for Blink Mode (Mode 1) ---
+const int blinkInterval = 500; // The blinking time interval (500ms)
+unsigned long blinkTimer = 0;  // Timer to track the blink interval
+bool blinkOn = true;           // Flag: Is the LED on (true) or off (false) during blink
+
+// --- 5. Variables for Fading Mode (Mode 2) ---
+const int fadeAmount = 2; // The fading amount per time step
+int fadeDirection = 1;    // Direction: 1 = increasing, -1 = decreasing
+
+// ------------------------------------
+// --- Functions ---
+// ------------------------------------
+
+// Function to set the RGB LED color
+void setRGBLEDColor(int r, int g, int b) {
+    analogWrite(RLedPin, r);
+    analogWrite(GLedPin, g);
+    analogWrite(BLedPin, b);
+}
+
+// Function to change the light color (called by Short Click)
+void changeLightColor() {
+    // Progress the light number (0, 1, 2, 3, 4)
+    LightNum = (LightNum + 1) % 5; 
+
+    // Reset and set the RGB light color according to the light number
+    RLightColor = 0;
+    GLightColor = 0;
+    BLightColor = 0;
+
+    switch (LightNum) {
+        case 0: // White
+            RLightColor = 255; GLightColor = 255; BLightColor = 255; break;
+        case 1: // Red
+            RLightColor = 255; break;
+        case 2: // Blue
+            BLightColor = 255; break;
+        case 3: // Green
+            GLightColor = 255; break;
+        case 4: // Yellow
+            RLightColor = 255; GLightColor = 255; break;
+    }
+}
+
+// Function to change the operating mode (called by Long Press)
+void changeMode() {
+    // Progress the mode number (0, 1, 2)
+    currentMode = (currentMode + 1) % 3; 
+    
+    // Reset variables for new mode effects
+    if (currentMode == 1) { // Blink Mode
+        blinkTimer = 0;
+        blinkOn = true;
+    } else if (currentMode == 2) { // Fading Mode
+        fadeDirection = 1;
+        // Start fading from the full target color
+        RCurrentColor = RLightColor; 
+        GCurrentColor = GLightColor; 
+        BCurrentColor = BLightColor; 
+    }
+}
+
+// Function for updating the LED Color based on the current Mode
+void updateLEDColor() {
+    if (currentMode == 0) { // Mode 0: Constant Light Mode
+        RCurrentColor = RLightColor;
+        GCurrentColor = GLightColor;
+        BCurrentColor = BLightColor;
+    } 
+    else if (currentMode == 1) { // Mode 1: Blink Mode
+        unsigned long currentTime = millis();
+        // Check if the blink interval has passed
+        if (currentTime - blinkTimer >= blinkInterval) {
+            blinkOn = !blinkOn; // Toggle state
+            blinkTimer = currentTime; 
+        }
+
+        if (blinkOn) {
+            RCurrentColor = RLightColor;
+            GCurrentColor = GLightColor;
+            BCurrentColor = BLightColor;
+        } else {
+            RCurrentColor = 0;
+            GCurrentColor = 0;
+            BCurrentColor = 0;
+        }
+    } 
+else if (currentMode == 2) { // Mode 2: Breathing Light Mode (Fading)    else if (currentMode == 2) { // Mode 2: Breathing Light Mode (Fading)
+// This logic makes sure that only non-zero color components fade.
+
+        // Control R component
+        if (RLightColor > 0) {
+            RCurrentColor = RCurrentColor + fadeDirection * fadeAmount;
+            if (RCurrentColor >= RLightColor || RCurrentColor <= 0) {
+                // Change direction if boundary is reached
+                fadeDirection *= -1; 
+                // Correct boundary value for smooth transition
+                RCurrentColor = (fadeDirection > 0) ? 0 : RLightColor; 
+            }
+        } else {
+            RCurrentColor = 0;
+        }
+
+        // Control G component
+        if (GLightColor > 0) {
+            GCurrentColor = GCurrentColor + fadeDirection * fadeAmount;
+            if (GCurrentColor >= GLightColor || GCurrentColor <= 0) {
+                fadeDirection *= -1;
+                GCurrentColor = (fadeDirection > 0) ? 0 : GLightColor;
+            }
+        } else {
+            GCurrentColor = 0;
+        }
+
+        // Control B component
+        if (BLightColor > 0) {
+            BCurrentColor = BCurrentColor + fadeDirection * fadeAmount;
+            if (BCurrentColor >= BLightColor || BCurrentColor <= 0) {
+                fadeDirection *= -1;
+                BCurrentColor = (fadeDirection > 0) ? 0 : BLightColor;
+            }
+        } else {
+            BCurrentColor = 0;
+        }
+    }
+}
+
+// Function to check the button and determine Short/Long Click
+void checkButton() {
+    // Read the button state
+    buttonState = digitalRead(buttonPin);
+
+    // 1. Detect button press start
+    // Assumes button is HIGH when pressed (requires external pull-up or HIGH-on-press wiring)
+    if (buttonState == HIGH && !buttonPressed) {
+        pressingTime = millis();
+        buttonPressed = true;
+    }
+
+    // 2. Detect button release
+    if (buttonState == LOW && buttonPressed) {
+        unsigned long currentTime = millis();
+        
+        // Short Click
+        if (currentTime - pressingTime < longPressInterval) {
+            // Short click is used to change color
+            changeLightColor(); 
+        } 
+        // Long Press
+        else {
+            // Long press is used to change mode
+            changeMode(); 
+        }
+        
+        buttonPressed = false; // Reset the press flag
+    }
+}
+
+// ------------------------------------
+// --- setup() and loop() ---
+// ------------------------------------
+
+void setup() {
+    // Set LED pins as OUTPUT
+    pinMode(RLedPin, OUTPUT);
+    pinMode(GLedPin, OUTPUT);
+    pinMode(BLedPin, OUTPUT);
+    
+    // Set button pin as INPUT. 
+    // Uses INPUT, assuming external pull-up resistor from Pin 2 to +5V.
+    pinMode(buttonPin, INPUT); 
+    
+    // Initialize the starting color (White)
+    changeLightColor(); // LightNum=0 (White)
+}
+
+void loop() {
+    // Always check the button
+    checkButton();
+    
+    // Update the current color based on the current mode
+    updateLEDColor();
+    
+    // Set the color on the LED
+    setRGBLEDColor(RCurrentColor, GCurrentColor, BCurrentColor);
+}
