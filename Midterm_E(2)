@@ -1,0 +1,127 @@
+// 2. CORRECTED CODE for Part E.2: Mode Switching (Cycle, Blink, Red Blink) + Hold
+
+const int BUTTON_PIN = 2; 
+const int RED_PIN = 9;    
+const int GREEN_PIN = 10; 
+const int BLUE_PIN = 11;  
+
+// State Definitions
+const int MODE_CYCLE = 0;      
+const int MODE_BLINK_YELLOW = 1;   
+const int MODE_BLINK_RED = 2; // Mode 3: Red Blink (as requested)
+const int NUM_MODES = 3;    
+
+// Colors for Mode 1: G, Y, R
+const int MODE1_COLORS[3][3] = { 
+  {0, 255, 0}, {255, 200, 0}, {255, 0, 0}
+};
+
+// State and Timing Variables
+int currentMode = MODE_CYCLE;
+int colorIndex = 0; 
+
+unsigned long previousModeMillis = 0;
+unsigned long buttonDownTime = 0; 
+const long CYCLE_INTERVAL = 2000; 
+const long BLINK_INTERVAL = 500;
+const long SHORT_PRESS_MAX = 500; // Max duration for a short press (0.5 sec)
+
+// --- Helper Functions ---
+
+// Sets the LED color using Common Anode logic (0=ON, 255=OFF)
+void setLED(int R, int G, int B) {
+  analogWrite(RED_PIN, 255 - R);
+  analogWrite(GREEN_PIN, 255 - G);
+  analogWrite(BLUE_PIN, 255 - B);
+}
+
+void runModeCycle(unsigned long currentMillis) { 
+  if (currentMillis - previousModeMillis >= CYCLE_INTERVAL) {
+    previousModeMillis = currentMillis;
+    colorIndex = (colorIndex + 1) % 3;
+    setLED(MODE1_COLORS[colorIndex][0], MODE1_COLORS[colorIndex][1], MODE1_COLORS[colorIndex][2]);
+  }
+}
+
+void runModeYellowBlink(unsigned long currentMillis) { 
+  if (currentMillis - previousModeMillis >= BLINK_INTERVAL) {
+    previousModeMillis = currentMillis;
+    if (colorIndex == 0) { // ON (Yellow)
+      setLED(255, 200, 0); colorIndex = 1;
+    } else { // OFF
+      setLED(0, 0, 0); colorIndex = 0;
+    }
+  }
+}
+
+void runModeRedBlink(unsigned long currentMillis) { 
+  if (currentMillis - previousModeMillis >= BLINK_INTERVAL) {
+    previousModeMillis = currentMillis;
+    if (colorIndex == 0) { // ON (Red)
+      setLED(255, 0, 0); colorIndex = 1;
+    } else { // OFF
+      setLED(0, 0, 0); colorIndex = 0;
+    }
+  }
+}
+
+// --- Main Program Logic ---
+
+void setup() {
+  pinMode(RED_PIN, OUTPUT);
+  pinMode(GREEN_PIN, OUTPUT);
+  pinMode(BLUE_PIN, OUTPUT);
+  pinMode(BUTTON_PIN, INPUT); 
+  setLED(0, 0, 0); 
+  previousModeMillis = millis();
+}
+
+void loop() {
+  static int lastButtonState = HIGH; 
+  int buttonState = digitalRead(BUTTON_PIN);
+  unsigned long currentTime = millis();
+
+  // 1. Detect Press (Transition HIGH -> LOW)
+  if (buttonState == LOW && lastButtonState == HIGH) {
+    buttonDownTime = currentTime; 
+  } 
+
+  // 2. Detect Release (Transition LOW -> HIGH) and check press duration
+  if (buttonState == HIGH && lastButtonState == LOW) {
+    unsigned long pressDuration = currentTime - buttonDownTime;
+
+    // Check for SHORT press (Mode Switching)
+    if (pressDuration < SHORT_PRESS_MAX) {
+      currentMode = (currentMode + 1) % NUM_MODES; // Switch mode
+      
+      // Reset variables for the new mode
+      previousModeMillis = currentTime;
+      colorIndex = 0;
+      setLED(0, 0, 0); 
+    }
+  }
+
+  lastButtonState = buttonState; 
+
+  // 3. Control LED (Hold takes priority)
+  if (buttonState == LOW) {
+    // Hold Requirement: LED turns OFF while held
+    setLED(0, 0, 0); 
+  } else {
+    // Button is released: Run the logic for the current mode
+    switch (currentMode) {
+      case MODE_CYCLE:
+        runModeCycle(currentTime);
+        break;
+
+      case MODE_BLINK_YELLOW:
+        runModeYellowBlink(currentTime);
+        break;
+
+      case MODE_BLINK_RED:
+        runModeRedBlink(currentTime);
+        break;
+    }
+  }
+}
+ 
