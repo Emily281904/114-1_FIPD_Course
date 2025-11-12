@@ -1,0 +1,171 @@
+// 3. FINAL CORRECTED CODE for Part E.3: Full State Machine (Long Press + Breathing)
+
+// --- Pin Definitions ---
+const int BUTTON_PIN = 2; 
+const int RED_PIN = 9;    
+const int GREEN_PIN = 10; 
+const int BLUE_PIN = 11;  
+
+// --- State Definitions ---
+const int MODE_CYCLE = 0;      
+const int MODE_BLINK_YELLOW = 1;   
+const int MODE_BLINK_RED = 2; 
+const int MODE_BREATH = 3;    // New Mode for Long Press (E.3)
+const int NUM_STANDARD_MODES = 3; // Modes 0, 1, 2 for cycling with short press
+
+// --- Constants ---
+const long CYCLE_INTERVAL = 2000;       // 2.0 s
+const long BLINK_INTERVAL = 500;
+const long SHORT_PRESS_MAX = 500;       // Max duration for mode switch (Short Press)
+const long LONG_PRESS_THRESHOLD = 1500; // 1.5 s for breathing mode
+
+// Colors for Mode 1: G, Y, R
+const int MODE1_COLORS[3][3] = { 
+  {0, 255, 0}, {255, 200, 0}, {255, 0, 0}
+};
+
+// --- State and Timing Variables ---
+int currentMode = MODE_CYCLE;
+int previousMode = MODE_CYCLE; // Stores mode before entering BREATH
+int colorIndex = 0; 
+unsigned long previousModeMillis = 0;
+unsigned long buttonDownTime = 0; 
+bool isButtonHeld = false; // Flag to enforce Hold-to-OFF priority
+
+// Breathing Variables
+int breathBrightness = 0; 
+const int BREATH_STEP = 5;  
+bool breathDirection = true; // true = R brightens/B dims; false = R dims/B brightens
+
+// --- Helper Functions ---
+
+// Sets the LED color using Common Anode logic (0=ON, 255=OFF)
+void setLED(int R, int G, int B) { 
+  analogWrite(RED_PIN, 255 - R);
+  analogWrite(GREEN_PIN, 255 - G);
+  analogWrite(BLUE_PIN, 255 - B);
+}
+
+void runModeCycle(unsigned long currentMillis) { 
+  if (currentMillis - previousModeMillis >= CYCLE_INTERVAL) {
+    previousModeMillis = currentMillis;
+    colorIndex = (colorIndex + 1) % 3;
+    setLED(MODE1_COLORS[colorIndex][0], MODE1_COLORS[colorIndex][1], MODE1_COLORS[colorIndex][2]);
+  }
+}
+
+void runModeYellowBlink(unsigned long currentMillis) { 
+  if (currentMillis - previousModeMillis >= BLINK_INTERVAL) {
+    previousModeMillis = currentMillis;
+    if (colorIndex == 0) { setLED(255, 200, 0); colorIndex = 1; } else { setLED(0, 0, 0); colorIndex = 0; }
+  }
+}
+
+void runModeRedBlink(unsigned long currentMillis) { 
+  if (currentMillis - previousModeMillis >= BLINK_INTERVAL) {
+    previousModeMillis = currentMillis;
+    if (colorIndex == 0) { setLED(255, 0, 0); colorIndex = 1; } else { setLED(0, 0, 0); colorIndex = 0; }
+  }
+}
+
+// Handles Breathing Mode (E.3: Red <-> Blue)
+void runModeBreathing() {
+  if (breathDirection) {
+    breathBrightness += BREATH_STEP;
+    if (breathBrightness >= 255) {
+      breathDirection = false; breathBrightness = 255;
+    }
+  } else {
+    breathBrightness -= BREATH_STEP;
+    if (breathBrightness <= 0) {
+      breathDirection = true; breathBrightness = 0;
+    }
+  }
+  
+  // R and B values alternate in brightness
+  int RedVal = breathDirection ? breathBrightness : 255 - breathBrightness;
+  int BlueVal = breathDirection ? 255 - breathBrightness : breathBrightness;
+
+  setLED(RedVal, 0, BlueVal);
+  delay(10); 
+}
+
+// --- Main Program Logic ---
+
+void setup() {
+  pinMode(RED_PIN, OUTPUT);
+  pinMode(GREEN_PIN, OUTPUT);
+  pinMode(BLUE_PIN, OUTPUT);
+  pinMode(BUTTON_PIN, INPUT); 
+  setLED(0, 0, 0); 
+  previousModeMillis = millis();
+}
+
+void loop() {
+  static int lastButtonState = HIGH; 
+  int buttonState = digitalRead(BUTTON_PIN);
+  unsigned long currentTime = millis();
+
+  // 1. Detect Press (Transition HIGH -> LOW)
+  if (buttonState == LOW && lastButtonState == HIGH) {
+    buttonDownTime = currentTime; 
+    isButtonHeld = true; // Button is now being held/pressed
+  } 
+
+  // 2. Detect Release (Transition LOW -> HIGH) - Decision point
+  if (buttonState == HIGH && lastButtonState == LOW) {
+    unsigned long pressDuration = currentTime - buttonDownTime;
+    isButtonHeld = false; // Button is released
+
+    if (pressDuration >= LONG_PRESS_THRESHOLD) {
+      // A) LONG PRESS (>= 1.5s): Enter Breathing Mode (E.3)
+      if (currentMode != MODE_BREATH) {
+          previousMode = (currentMode == MODE_BREATH) ? previousMode : currentMode; 
+      }
+      currentMode = MODE_BREATH;
+      breathBrightness = 0;
+      breathDirection = true;
+    } 
+    else if (pressDuration < SHORT_PRESS_MAX) {
+      // B) SHORT PRESS (< 0.5s): Switch Mode or Return from Breathing (E.2/E.3)
+      if (currentMode == MODE_BREATH) {
+        // Return from Breathing Mode
+        currentMode = previousMode; 
+      } else {
+        // Cycle standard modes
+        currentMode = (currentMode + 1) % NUM_STANDARD_MODES; 
+      }
+      
+      previousModeMillis = currentTime;
+      colorIndex = 0;
+    }
+    // Medium press (0.5s - 1.5s) is ignored for mode change.
+  }
+
+  lastButtonState = buttonState; 
+
+  // 3. Control LED: Hold-to-OFF OR Run Mode
+  if (isButtonHeld) { 
+    // D/E.1/E.3 Requirement: LED must be OFF while the button is pressed/held.
+    setLED(0, 0, 0); 
+  } else { 
+    // Button is released: Run the logic for the current mode
+    switch (currentMode) {
+      case MODE_CYCLE:
+        runModeCycle(currentTime);
+        break;
+
+      case MODE_BLINK_YELLOW:
+        runModeYellowBlink(currentTime);
+        break;
+
+      case MODE_BLINK_RED:
+        runModeRedBlink(currentTime);
+        break;
+        
+      case MODE_BREATH:
+        runModeBreathing(); 
+        break;
+    }
+  }
+}
