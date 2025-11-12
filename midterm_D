@@ -1,0 +1,43 @@
+// Pin Definitions based on your wiring:
+// Button: D2, RGB: D9, D10, D11 (PWM pins)
+const int BUTTON_PIN = 2; 
+const int RED_PIN = 9;    
+const int GREEN_PIN = 10; 
+const int BLUE_PIN = 11;  
+
+// Helper function to set the LED color, handling Common Anode logic (0 = ON, 255 = OFF)
+void setLED(int R, int G, int B) {
+  // Invert the brightness value: 
+  // If we want R=255 (max brightness), we write 255 - 255 = 0 (LOW)
+  analogWrite(RED_PIN, 255 - R);
+  analogWrite(GREEN_PIN, 255 - G);
+  analogWrite(BLUE_PIN, 255 - B);
+}
+
+void setup() {
+  // Set RGB pins as OUTPUT (PWM)
+  pinMode(RED_PIN, OUTPUT);
+  pinMode(GREEN_PIN, OUTPUT);
+  pinMode(BLUE_PIN, OUTPUT);
+
+  // Set the button pin as INPUT (since the module handles pull-up/down)
+  // State: HIGH (Released), LOW (Pressed)
+  pinMode(BUTTON_PIN, INPUT); 
+
+  // Ensure the LED is off at startup
+  setLED(0, 0, 0); 
+}
+
+void loop() {
+  // Read the button state
+  int buttonState = digitalRead(BUTTON_PIN);
+
+  // Task 1: LED turns ON when the button is pressed
+  if (buttonState == LOW) { 
+    // Turn the LED ON to White (R=255, G=255, B=255)
+    setLED(255, 255, 255); 
+  } else { 
+    // Task 2: LED turns OFF when the button is released
+    setLED(0, 0, 0); 
+  }
+}
